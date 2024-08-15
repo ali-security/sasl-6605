@@ -1,0 +1,35 @@
+name: Go Workflow
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    container:
+      image: golang:latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18'  # Specify the version of Go you want to use
+
+      - name: Check Go version
+        run: go version
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test with race condition check
+        run: go test -race ./...
+
+      - name: Test with coverage
+        run: go test -cover ./...
+
+      - name: Benchmark
+        run: go test -bench . -benchmem ./...

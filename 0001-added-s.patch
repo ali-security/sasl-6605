@@ -1,0 +1,76 @@
+From e6cbf681b247c4efa1477eaad2cc47a01707b732 Mon Sep 17 00:00:00 2001
+From: Sam Whited <sam@samwhited.com>
+Date: Wed, 28 Dec 2022 07:43:34 -0500
+Subject: [PATCH] sasl: fix early return in new state machine
+
+Previously when there were remote mechanisms that support channel
+binding we were returning early and not setting the nonce. This resulted
+in authentication failing when remote mechanisms that support channel
+binding were advertised.
+
+Signed-off-by: Sam Whited <sam@samwhited.com>
+---
+ CHANGELOG.md  | 8 ++++++++
+ negotiator.go | 4 ++--
+ sasl_test.go  | 6 ++++++
+ 3 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index fd7af01..f5eab4d 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -3,6 +3,14 @@
+ All notable changes to this project will be documented in this file.
+ 
+ 
++##  v0.3.1 — 2022-12-28
++
++### Fixed
++
++- Sometimes the nonce was not set on the SASL state machine, resulting in
++  authentication failing
++
++
+ ##  v0.3.0 — 2022-08-15
+ 
+ ### Added
+diff --git a/negotiator.go b/negotiator.go
+index b827dff..8b4c3de 100644
+--- a/negotiator.go
++++ b/negotiator.go
+@@ -50,7 +50,7 @@ func NewClient(m Mechanism, opts ...Option) *Negotiator {
+ 		lname := m.Name
+ 		if lname == rname && strings.HasSuffix(lname, "-PLUS") {
+ 			machine.state |= RemoteCB
+-			return machine
++			break
+ 		}
+ 	}
+ 	if len(machine.nonce) == 0 {
+@@ -76,7 +76,7 @@ func NewServer(m Mechanism, permissions func(*Negotiator) bool, opts ...Option)
+ 		lname := m.Name
+ 		if lname == rname && strings.HasSuffix(lname, "-PLUS") {
+ 			machine.state |= RemoteCB
+-			return machine
++			break
+ 		}
+ 	}
+ 	if len(machine.nonce) == 0 {
+diff --git a/sasl_test.go b/sasl_test.go
+index 78d94c4..5c12b16 100644
+--- a/sasl_test.go
++++ b/sasl_test.go
+@@ -451,7 +451,13 @@ func TestSASL(t *testing.T) {
+ 	for i, tc := range saslTestCases {
+ 		t.Run(strconv.Itoa(i), func(t *testing.T) {
+ 			client := sasl.NewClient(tc.mechanism, tc.clientOpts...)
++			if len(client.Nonce()) == 0 {
++				t.Fatal("test client did not set nonce!")
++			}
+ 			server := sasl.NewServer(tc.mechanism, tc.perm, tc.serverOpts...)
++			if len(client.Nonce()) == 0 {
++				t.Fatal("test server did not set nonce!")
++			}
+ 
+ 			// Run each test twice to make sure that Reset actually sets the state
+ 			// back to the initial state.

@@ -391,7 +391,13 @@ func TestSASL(t *testing.T) {
 	for i, tc := range saslTestCases {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			client := NewClient(tc.mechanism, tc.clientOpts...)
+			if len(client.Nonce()) == 0 {
+				t.Fatal("test client did not set nonce!")
+			}
 			server := NewServer(tc.mechanism, tc.perm, tc.serverOpts...)
+			if len(client.Nonce()) == 0 {
+				t.Fatal("test server did not set nonce!")
+			}
 
 			// Run each test twice to make sure that Reset actually sets the state back
 			// to the initial state.
